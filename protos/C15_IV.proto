@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+option java_package         = "whatsappbackupreader.protos";
+
+// In crypt15 files only the IV is stored.
+message C15_IV {
+    bytes IV = 1; // The 16-bytes long IV
+}
