@@ -18,7 +18,6 @@ public class WhatsappBackupReader {
 	private Path keyPath;
 	private byte[] encrypted;
 	
-	private MessageDigest file_hash;
 	private ByteString iv;
 	
 	private final int LENGTH_CHECKSUM = 16;
@@ -32,15 +31,17 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Cannot read encrypted file", e);
 		}
 		
-		try {
-			file_hash = MessageDigest.getInstance("MD5");
-		} catch (NoSuchAlgorithmException e) {
-			throw new WhatsappBackupReaderException("Cannot initiate md5 sum generator", e);
-		}
-		
+		byte buf = 0;
 		int pos = 0;
 		
-		int protobufSize = Byte.toUnsignedInt(encrypted[pos]); pos++;
+		buf = encrypted[pos]; pos++;
+		
+		/*System.out.println(byteArrayAsHex(file_hash.digest()));
+		if(true) {
+			return;
+		}*/
+		
+		int protobufSize = Byte.toUnsignedInt(buf);
 		System.out.println(protobufSize);
 		
 		// TODO rename
@@ -51,13 +52,10 @@ public class WhatsappBackupReader {
 		// A 0x01 as a second byte indicates the presence of the feature table in the protobuf.
 		// It is optional and present only in msgstore database, although
         // Some old msgstore backups exist without it, so it is optional.
-		byte buf = encrypted[pos]; pos++;
+		buf = encrypted[pos]; pos++;
 		int msgstore_features_flag = Byte.toUnsignedInt(buf);
         if(msgstore_features_flag != 1) {  
             msgstore_features_flag = 0;
-        }
-        else {
-        	file_hash.update(buf);
         }
         
         if(msgstore_features_flag == 0) {   
@@ -65,7 +63,6 @@ public class WhatsappBackupReader {
         }
 
         byte[] protobuf_raw = Arrays.copyOfRange(encrypted, pos, pos + protobufSize); pos += protobufSize;
-        file_hash.update(protobuf_raw);
         
         BackupPrefix header;
         try {
@@ -107,28 +104,38 @@ public class WhatsappBackupReader {
 		byte[] key2 = hexStringToByteArray(keystr);
 		System.out.println(byteArrayAsHex(key2));
 		
-		byte[] checksumExpected = Arrays.copyOfRange(encrypted, encrypted.length - LENGTH_CHECKSUM, encrypted.length);
+		int checkSumStart = encrypted.length - LENGTH_CHECKSUM;
+		byte[] checksumExpected = Arrays.copyOfRange(encrypted, checkSumStart, encrypted.length);
 		
 		int authenticationTagStart = encrypted.length - LENGTH_CHECKSUM - LENGTH_AUTHENTICATION_TAG;
-		byte[] authenticationTag = Arrays.copyOfRange(encrypted, authenticationTagStart, encrypted.length);
+		byte[] authenticationTag = Arrays.copyOfRange(encrypted, authenticationTagStart, checkSumStart);
 		
-		byte[] encryptedData = Arrays.copyOfRange(encrypted, 0, encrypted.length - authenticationTagStart);
+		byte[] encryptedData = Arrays.copyOfRange(encrypted, 0, authenticationTagStart);
 		
 		// if check md5-checksum is correct
 		System.out.println("Checksum expected: " + byteArrayAsHex(checksumExpected));
 		
-		MessageDigest md;
-		try {
-			md = MessageDigest.getInstance("MD5");
+		/*try {
+			file_hash = MessageDigest.getInstance("MD5");
 		} catch (NoSuchAlgorithmException e) {
 			throw new WhatsappBackupReaderException("Cannot initiate md5 sum generator", e);
-		}
+		}*/
 		
-		md.update(encryptedData);
-		md.update(authenticationTag);
+		MessageDigest md5;
+		try {
+			md5 = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			throw new WhatsappBackupReaderException("Cannot initiate md5 sum generator", e);
+		} 
+		md5.update(encryptedData);
+		md5.update(authenticationTag);
 		
-		byte[] checksumActual = md.digest();
+		byte[] checksumActual = md5.digest();
 		System.out.println("Checksum actual: " + byteArrayAsHex(checksumActual));
+		
+		if(!Arrays.equals(checksumExpected, checksumActual)) {
+			throw new WhatsappBackupReaderException("Checksums not equal");
+		}
 	}
 	
 	private byte hexCharToByte(char c) throws WhatsappBackupReaderException {
@@ -156,7 +163,7 @@ public class WhatsappBackupReader {
 	}
 	
 	private byte[] hexStringToByteArray(String str) throws WhatsappBackupReaderException {
-		// DO proper trimming, see trimPassphrase in SignalBackupReader
+		// TODO proper trimming, see trimPassphrase in SignalBackupReader
 		str = str.trim();
 		
 		if(str.length() % 2 != 0) {
