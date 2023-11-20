@@ -18,7 +18,7 @@ public class WhatsappBackupReader {
 	private Path keyPath;
 	private byte[] encrypted;
 	
-	private ByteString iv;
+	private byte[] iv;
 	
 	private final int LENGTH_CHECKSUM = 16;
 	private final int LENGTH_AUTHENTICATION_TAG = 16;
@@ -81,7 +81,8 @@ public class WhatsappBackupReader {
         		);
         	}
         	
-        	this.iv = header.getC15Iv().getIV();
+        	this.iv = header.getC15Iv().getIV().toByteArray();
+        	System.out.println("iv: " + byteArrayAsHex(this.iv));
         	
         } else if(header.hasC14Cipher()) {
         	throw new WhatsappBackupReaderException("C14 not implemented");
