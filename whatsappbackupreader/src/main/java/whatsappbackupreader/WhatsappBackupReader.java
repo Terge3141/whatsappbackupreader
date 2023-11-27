@@ -212,8 +212,7 @@ public class WhatsappBackupReader {
 	}
 	
 	private byte[] hexStringToByteArray(String str) throws WhatsappBackupReaderException {
-		// TODO proper trimming, see trimPassphrase in SignalBackupReader
-		str = str.trim();
+		str = str.replace(" ", "").replace("\n", "");
 		
 		if(str.length() % 2 != 0) {
 			throw new WhatsappBackupReaderException("Key string length must be divisble by two");
