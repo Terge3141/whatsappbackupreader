@@ -116,28 +116,24 @@ public class WhatsappBackupReader {
 		
 		byte b = (byte)1;
 		hasher.update(b);
-		byte[] data = hasher.doFinal();
+		byte[] buf = hasher.doFinal();
 		
-		return data;
+		return buf;
 	}
 	
 	public void decrypt() throws WhatsappBackupReaderException {
-		byte[] key = null;
+		String keyFileStr;
 		try {
-			key = Files.readAllBytes(keyPath);
+			keyFileStr = Files.readString(keyPath);
 		} catch (IOException e) {
 			throw new WhatsappBackupReaderException("Cannot read key file", e);
 		}
 		
-		//String keyStr = Files.readString(keyPath);
-		String keystr = new String(key, StandardCharsets.UTF_8);
+		byte[] keyFileArr = hexStringToByteArray(keyFileStr);
 		
-		System.out.println("keystr: " + keystr);
-		byte[] key2_ = hexStringToByteArray(keystr);
-		byte[] key3;
-		//System.out.println(byteArrayAsHex(key2_));
+		byte[] key;
 		try {
-			key3 = getKey(key2_);
+			key = getKey(keyFileArr);
 		} catch (InvalidKeyException | NoSuchAlgorithmException e) {
 			throw new WhatsappBackupReaderException("Cannot initialize keys", e);
 		}
@@ -151,14 +147,6 @@ public class WhatsappBackupReader {
 		byte[] encryptedData = Arrays.copyOfRange(encrypted, 0, authenticationTagStart);
 		
 		// if check md5-checksum is correct
-		System.out.println("Checksum expected: " + byteArrayAsHex(checksumExpected));
-		
-		/*try {
-			file_hash = MessageDigest.getInstance("MD5");
-		} catch (NoSuchAlgorithmException e) {
-			throw new WhatsappBackupReaderException("Cannot initiate md5 sum generator", e);
-		}*/
-		
 		MessageDigest md5;
 		try {
 			md5 = MessageDigest.getInstance("MD5");
@@ -167,22 +155,15 @@ public class WhatsappBackupReader {
 		} 
 		md5.update(encryptedData);
 		md5.update(authenticationTag);
-		
 		byte[] checksumActual = md5.digest();
-		System.out.println("Checksum actual: " + byteArrayAsHex(checksumActual));
 		
 		if(!Arrays.equals(checksumExpected, checksumActual)) {
 			throw new WhatsappBackupReaderException("Checksums not equal");
 		}
 		
-		//byte[] payload = Arrays.copyOfRange(encrypted, pos, authenticationTagStart);
 		byte[] payload = Arrays.copyOfRange(encrypted, pos, checkSumStart);
-		System.out.println("Payload length: " + payload.length);
-		System.out.println("Payload: " + byteArrayAsHex(payload, 16));
-		System.out.println("iv: " + byteArrayAsHex(iv));
-		System.out.println("key3: " + byteArrayAsHex(key3));
 		GCMParameterSpec parameterSpec = new GCMParameterSpec(LENGTH_AUTHENTICATION_TAG*8, iv);
-		SecretKeySpec secretKeySpec = new SecretKeySpec(key3, "AES");
+		SecretKeySpec secretKeySpec = new SecretKeySpec(key, "AES");
 		
 		Cipher cipher;
 		try {
@@ -191,8 +172,6 @@ public class WhatsappBackupReader {
 		} catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
 			throw new WhatsappBackupReaderException("Could not initialize cipher", e);
 		}
-		
-		//cipher.updateAAD(authenticationTag);
 		
 		byte[] decrypted;
 		try {
