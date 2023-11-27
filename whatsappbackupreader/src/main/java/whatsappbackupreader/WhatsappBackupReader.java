@@ -1,13 +1,29 @@
 package whatsappbackupreader;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.Security;
 import java.util.Arrays;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -16,6 +32,7 @@ import whatsappbackupreader.protos.BackupPrefixOuterClass.BackupPrefix;
 
 public class WhatsappBackupReader {
 	private Path keyPath;
+	private Path outputPath;
 	private byte[] encrypted;
 	
 	private byte[] iv;
@@ -23,8 +40,11 @@ public class WhatsappBackupReader {
 	private final int LENGTH_CHECKSUM = 16;
 	private final int LENGTH_AUTHENTICATION_TAG = 16;
 	
-	public WhatsappBackupReader(Path keyPath, Path cryptPath) throws WhatsappBackupReaderException {
+	int pos = 0;
+	
+	public WhatsappBackupReader(Path keyPath, Path cryptPath, Path outputPath) throws WhatsappBackupReaderException {
 		this.keyPath = keyPath;
+		this.outputPath = outputPath;
 		try {
 			this.encrypted = Files.readAllBytes(cryptPath);
 		} catch (IOException e) {
@@ -32,7 +52,7 @@ public class WhatsappBackupReader {
 		}
 		
 		byte buf = 0;
-		int pos = 0;
+		pos = 0;
 		
 		buf = encrypted[pos]; pos++;
 		
@@ -91,6 +111,45 @@ public class WhatsappBackupReader {
         }
 	}
 	
+	private byte[] getKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeyException {
+		byte[] privateseed = new byte[32];
+		String algorithm  ="HmacSHA256"; // TODO global constant
+		/*for(Provider p : Security.getProviders()) {
+			System.out.println("Name: " + p.getName());
+		}*/
+		
+		String messageStr = "backup encryption"; // TODO global constant
+		byte[] message = messageStr.getBytes();
+		System.out.println("message: " + byteArrayAsHex(message));
+		
+		SecretKeySpec secretKeySpec = new SecretKeySpec(privateseed, algorithm);
+		Mac mac = Mac.getInstance(algorithm);
+		mac.init(secretKeySpec);
+		mac.update(key);
+		
+		byte[] privatekey = mac.doFinal();
+		byte[] data = new byte[0];
+		System.out.println("privatekey: " + byteArrayAsHex(privatekey));
+		
+		SecretKeySpec hasherSpec = new SecretKeySpec(privatekey, algorithm);
+		
+		Mac hasher = Mac.getInstance(algorithm);
+		hasher.init(hasherSpec);
+		hasher.update(data);
+		
+		hasher.update(message);
+		
+		byte b = (byte)1;
+		hasher.update(b);
+		data = hasher.doFinal();
+		
+		System.out.println("data: " + byteArrayAsHex(data));
+		return data;
+		
+		
+		//return bytesToHex(mac.doFinal(data.getBytes()));
+	}
+	
 	public void decrypt() throws WhatsappBackupReaderException {
 		byte[] key = null;
 		try {
@@ -102,8 +161,14 @@ public class WhatsappBackupReader {
 		String keystr = new String(key, StandardCharsets.UTF_8);
 		
 		System.out.println(keystr);
-		byte[] key2 = hexStringToByteArray(keystr);
-		System.out.println(byteArrayAsHex(key2));
+		byte[] key2_ = hexStringToByteArray(keystr);
+		byte[] key3;
+		//System.out.println(byteArrayAsHex(key2_));
+		try {
+			key3 = getKey(key2_);
+		} catch (InvalidKeyException | NoSuchAlgorithmException e) {
+			throw new WhatsappBackupReaderException("Cannot initialize keys", e);
+		}
 		
 		int checkSumStart = encrypted.length - LENGTH_CHECKSUM;
 		byte[] checksumExpected = Arrays.copyOfRange(encrypted, checkSumStart, encrypted.length);
@@ -136,6 +201,46 @@ public class WhatsappBackupReader {
 		
 		if(!Arrays.equals(checksumExpected, checksumActual)) {
 			throw new WhatsappBackupReaderException("Checksums not equal");
+		}
+		
+		//byte[] payload = Arrays.copyOfRange(encrypted, pos, authenticationTagStart);
+		byte[] payload = Arrays.copyOfRange(encrypted, pos, checkSumStart);
+		System.out.println("Payload length: " + payload.length);
+		System.out.println("Payload: " + byteArrayAsHex(payload, 16));
+		System.out.println("iv: " + byteArrayAsHex(iv));
+		System.out.println("key3: " + byteArrayAsHex(key3));
+		GCMParameterSpec parameterSpec = new GCMParameterSpec(LENGTH_AUTHENTICATION_TAG*8, iv);
+		SecretKeySpec secretKeySpec = new SecretKeySpec(key3, "AES");
+		
+		Cipher cipher;
+		try {
+			cipher = Cipher.getInstance("AES/GCM/NoPadding");
+			cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, parameterSpec);
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
+			throw new WhatsappBackupReaderException("Could not initialize cipher", e);
+		}
+		
+		//cipher.updateAAD(authenticationTag);
+		
+		byte[] decrypted;
+		try {
+			cipher.update(payload);
+			decrypted = cipher.doFinal();
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			throw new WhatsappBackupReaderException("Could not decrypt", e);
+		}
+		
+		Inflater zlib = new Inflater(false);
+		System.out.println("Writing to: " + outputPath);
+		try(FileOutputStream s = new FileOutputStream(outputPath.toFile())) {
+			zlib.setInput(decrypted, 0, decrypted.length);
+            byte[] buf = new byte[1024];
+            while(!zlib.needsInput()) {
+                int l = zlib.inflate(buf, 0, buf.length);
+                if(l > 0) s.write(buf, 0, l);
+            }
+        } catch (IOException | DataFormatException e) {
+        	throw new WhatsappBackupReaderException("Could not decompress", e);
 		}
 	}
 	
@@ -184,9 +289,13 @@ public class WhatsappBackupReader {
 	}
 	
 	private String byteArrayAsHex(byte[] arr) {
+		return  byteArrayAsHex(arr, arr.length);
+	}
+	
+	private String byteArrayAsHex(byte[] arr, int len) {
 		String str = "";
 		
-		for(int i=0; i<arr.length; i++) {
+		for(int i=0; i<len; i++) {
 			str = str + String.format("%02x", arr[i]);
 		}
 		
