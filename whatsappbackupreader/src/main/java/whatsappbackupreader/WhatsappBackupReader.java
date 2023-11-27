@@ -1,7 +1,5 @@
 package whatsappbackupreader;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,8 +9,6 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.Provider;
-import java.security.Security;
 import java.util.Arrays;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -25,7 +21,6 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import whatsappbackupreader.protos.BackupPrefixOuterClass.BackupPrefix;
@@ -39,6 +34,8 @@ public class WhatsappBackupReader {
 	
 	private final int LENGTH_CHECKSUM = 16;
 	private final int LENGTH_AUTHENTICATION_TAG = 16;
+	private final String ALGORITHM = "HmacSHA256";
+	private final String MESSAGE_STRING = "backup encryption";
 	
 	int pos = 0;
 	
@@ -56,37 +53,26 @@ public class WhatsappBackupReader {
 		
 		buf = encrypted[pos]; pos++;
 		
-		/*System.out.println(byteArrayAsHex(file_hash.digest()));
-		if(true) {
-			return;
-		}*/
-		
 		int protobufSize = Byte.toUnsignedInt(buf);
-		System.out.println(protobufSize);
-		
-		// TODO rename
-		// file_hash
-		// msgstore_features_flag
-		
 		
 		// A 0x01 as a second byte indicates the presence of the feature table in the protobuf.
 		// It is optional and present only in msgstore database, although
         // Some old msgstore backups exist without it, so it is optional.
 		buf = encrypted[pos]; pos++;
-		int msgstore_features_flag = Byte.toUnsignedInt(buf);
-        if(msgstore_features_flag != 1) {  
-            msgstore_features_flag = 0;
+		int msgstoreFeaturesFlag = Byte.toUnsignedInt(buf);
+        if(msgstoreFeaturesFlag != 1) {  
+            msgstoreFeaturesFlag = 0;
         }
         
-        if(msgstore_features_flag == 0) {   
+        if(msgstoreFeaturesFlag == 0) {   
         	System.out.println("No feature table found (not a msgstore DB or very old)");
         }
 
-        byte[] protobuf_raw = Arrays.copyOfRange(encrypted, pos, pos + protobufSize); pos += protobufSize;
+        byte[] protobufRaw = Arrays.copyOfRange(encrypted, pos, pos + protobufSize); pos += protobufSize;
         
         BackupPrefix header;
         try {
-			header = BackupPrefix.parseFrom(protobuf_raw);
+			header = BackupPrefix.parseFrom(protobufRaw);
 		} catch (InvalidProtocolBufferException e) {
 			throw new WhatsappBackupReaderException("Could not backup prefix protobuf", e);
 		}
@@ -113,41 +99,26 @@ public class WhatsappBackupReader {
 	
 	private byte[] getKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] privateseed = new byte[32];
-		String algorithm  ="HmacSHA256"; // TODO global constant
-		/*for(Provider p : Security.getProviders()) {
-			System.out.println("Name: " + p.getName());
-		}*/
 		
-		String messageStr = "backup encryption"; // TODO global constant
-		byte[] message = messageStr.getBytes();
-		System.out.println("message: " + byteArrayAsHex(message));
+		byte[] message = MESSAGE_STRING.getBytes();
 		
-		SecretKeySpec secretKeySpec = new SecretKeySpec(privateseed, algorithm);
-		Mac mac = Mac.getInstance(algorithm);
+		SecretKeySpec secretKeySpec = new SecretKeySpec(privateseed, ALGORITHM);
+		Mac mac = Mac.getInstance(ALGORITHM);
 		mac.init(secretKeySpec);
 		mac.update(key);
 		
 		byte[] privatekey = mac.doFinal();
-		byte[] data = new byte[0];
-		System.out.println("privatekey: " + byteArrayAsHex(privatekey));
 		
-		SecretKeySpec hasherSpec = new SecretKeySpec(privatekey, algorithm);
-		
-		Mac hasher = Mac.getInstance(algorithm);
+		SecretKeySpec hasherSpec = new SecretKeySpec(privatekey, ALGORITHM);
+		Mac hasher = Mac.getInstance(ALGORITHM);
 		hasher.init(hasherSpec);
-		hasher.update(data);
-		
 		hasher.update(message);
 		
 		byte b = (byte)1;
 		hasher.update(b);
-		data = hasher.doFinal();
+		byte[] data = hasher.doFinal();
 		
-		System.out.println("data: " + byteArrayAsHex(data));
 		return data;
-		
-		
-		//return bytesToHex(mac.doFinal(data.getBytes()));
 	}
 	
 	public void decrypt() throws WhatsappBackupReaderException {
@@ -158,9 +129,10 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Cannot read key file", e);
 		}
 		
+		//String keyStr = Files.readString(keyPath);
 		String keystr = new String(key, StandardCharsets.UTF_8);
 		
-		System.out.println(keystr);
+		System.out.println("keystr: " + keystr);
 		byte[] key2_ = hexStringToByteArray(keystr);
 		byte[] key3;
 		//System.out.println(byteArrayAsHex(key2_));
