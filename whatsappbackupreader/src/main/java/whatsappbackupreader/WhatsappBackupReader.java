@@ -2,7 +2,6 @@ package whatsappbackupreader;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidAlgorithmParameterException;
@@ -28,7 +27,7 @@ import whatsappbackupreader.protos.BackupPrefixOuterClass.BackupPrefix;
 public class WhatsappBackupReader {
 	private Path keyPath;
 	private Path outputPath;
-	private byte[] encrypted;
+	private byte[] data;
 	
 	private byte[] iv;
 	
@@ -43,7 +42,7 @@ public class WhatsappBackupReader {
 		this.keyPath = keyPath;
 		this.outputPath = outputPath;
 		try {
-			this.encrypted = Files.readAllBytes(cryptPath);
+			this.data = Files.readAllBytes(cryptPath);
 		} catch (IOException e) {
 			throw new WhatsappBackupReaderException("Cannot read encrypted file", e);
 		}
@@ -51,14 +50,14 @@ public class WhatsappBackupReader {
 		byte buf = 0;
 		pos = 0;
 		
-		buf = encrypted[pos]; pos++;
+		buf = data[pos]; pos++;
 		
 		int protobufSize = Byte.toUnsignedInt(buf);
 		
 		// A 0x01 as a second byte indicates the presence of the feature table in the protobuf.
 		// It is optional and present only in msgstore database, although
         // Some old msgstore backups exist without it, so it is optional.
-		buf = encrypted[pos]; pos++;
+		buf = data[pos]; pos++;
 		int msgstoreFeaturesFlag = Byte.toUnsignedInt(buf);
         if(msgstoreFeaturesFlag != 1) {  
             msgstoreFeaturesFlag = 0;
@@ -68,7 +67,7 @@ public class WhatsappBackupReader {
         	System.out.println("No feature table found (not a msgstore DB or very old)");
         }
 
-        byte[] protobufRaw = Arrays.copyOfRange(encrypted, pos, pos + protobufSize); pos += protobufSize;
+        byte[] protobufRaw = Arrays.copyOfRange(data, pos, pos + protobufSize); pos += protobufSize;
         
         BackupPrefix header;
         try {
@@ -138,13 +137,8 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Cannot initialize keys", e);
 		}
 		
-		int checkSumStart = encrypted.length - LENGTH_CHECKSUM;
-		byte[] checksumExpected = Arrays.copyOfRange(encrypted, checkSumStart, encrypted.length);
-		
-		int authenticationTagStart = encrypted.length - LENGTH_CHECKSUM - LENGTH_AUTHENTICATION_TAG;
-		byte[] authenticationTag = Arrays.copyOfRange(encrypted, authenticationTagStart, checkSumStart);
-		
-		byte[] encryptedData = Arrays.copyOfRange(encrypted, 0, authenticationTagStart);
+		int checkSumStart = data.length - LENGTH_CHECKSUM;
+		byte[] checksumExpected = Arrays.copyOfRange(data, checkSumStart, data.length);
 		
 		// if check md5-checksum is correct
 		MessageDigest md5;
@@ -152,16 +146,15 @@ public class WhatsappBackupReader {
 			md5 = MessageDigest.getInstance("MD5");
 		} catch (NoSuchAlgorithmException e) {
 			throw new WhatsappBackupReaderException("Cannot initiate md5 sum generator", e);
-		} 
-		md5.update(encryptedData);
-		md5.update(authenticationTag);
+		}
+		
+		md5.update(data, 0, checkSumStart);
 		byte[] checksumActual = md5.digest();
 		
 		if(!Arrays.equals(checksumExpected, checksumActual)) {
 			throw new WhatsappBackupReaderException("Checksums not equal");
 		}
 		
-		byte[] payload = Arrays.copyOfRange(encrypted, pos, checkSumStart);
 		GCMParameterSpec parameterSpec = new GCMParameterSpec(LENGTH_AUTHENTICATION_TAG*8, iv);
 		SecretKeySpec secretKeySpec = new SecretKeySpec(key, "AES");
 		
@@ -175,8 +168,7 @@ public class WhatsappBackupReader {
 		
 		byte[] decrypted;
 		try {
-			cipher.update(payload);
-			decrypted = cipher.doFinal();
+			decrypted = cipher.doFinal(data, pos, checkSumStart - pos);
 		} catch (IllegalBlockSizeException | BadPaddingException e) {
 			throw new WhatsappBackupReaderException("Could not decrypt", e);
 		}
