@@ -96,6 +96,7 @@ public class WhatsappBackupReader {
         }
 	}
 	
+	// see https://raw.githubusercontent.com/ElDavoo/wa-crypt-tools/main/src/wa_crypt_tools/lib/key/key15.py for more information
 	private byte[] getKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] privateseed = new byte[32];
 		
@@ -242,13 +243,5 @@ public class WhatsappBackupReader {
 		}
 		
 		return str;
-	}
-	
-	/*private byte[] getBytes(Path path) throws IOException {
-		FileInputStream fip = new FileInputStream(path.toFile());
-		byte[] data = fip.readAllBytes();
-		fip.close();
-		
-		return data;
-	}*/
+	}	
 }
