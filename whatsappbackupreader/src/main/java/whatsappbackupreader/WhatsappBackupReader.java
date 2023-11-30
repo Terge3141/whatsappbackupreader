@@ -25,9 +25,12 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import whatsappbackupreader.protos.BackupPrefixOuterClass.BackupPrefix;
 
 public class WhatsappBackupReader {
-	private Path keyPath;
 	private Path outputPath;
+	
+	private byte[] keyFileData;
+	
 	private byte[] data;
+	int pos = 0;
 	
 	private byte[] iv;
 	
@@ -36,19 +39,26 @@ public class WhatsappBackupReader {
 	private final String ALGORITHM = "HmacSHA256";
 	private final String MESSAGE_STRING = "backup encryption";
 	
-	int pos = 0;
+	
 	
 	public WhatsappBackupReader(Path keyPath, Path cryptPath, Path outputPath) throws WhatsappBackupReaderException {
-		this.keyPath = keyPath;
 		this.outputPath = outputPath;
 		try {
+			this.keyFileData = Files.readAllBytes(keyPath);
 			this.data = Files.readAllBytes(cryptPath);
 		} catch (IOException e) {
-			throw new WhatsappBackupReaderException("Cannot read encrypted file", e);
+			throw new WhatsappBackupReaderException("Cannot read key or encrypted file", e);
 		}
 		
-		byte buf = 0;
 		pos = 0;
+	}
+
+	/**
+	 * Parse proto files from header. Runs silently unless an error occurs, e.g. incorrect format or wrong version 
+	 * @throws WhatsappBackupReaderException
+	 */
+	private void parseHeader() throws WhatsappBackupReaderException {
+		byte buf = 0;
 		
 		buf = data[pos]; pos++;
 		
@@ -87,7 +97,6 @@ public class WhatsappBackupReader {
         	}
         	
         	this.iv = header.getC15Iv().getIV().toByteArray();
-        	System.out.println("iv: " + byteArrayAsHex(this.iv));
         	
         } else if(header.hasC14Cipher()) {
         	throw new WhatsappBackupReaderException("C14 not implemented");
@@ -97,7 +106,7 @@ public class WhatsappBackupReader {
 	}
 	
 	// see https://raw.githubusercontent.com/ElDavoo/wa-crypt-tools/main/src/wa_crypt_tools/lib/key/key15.py for more information
-	private byte[] getKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeyException {
+	private byte[] calculateKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] privateseed = new byte[32];
 		
 		byte[] message = MESSAGE_STRING.getBytes();
@@ -122,18 +131,15 @@ public class WhatsappBackupReader {
 	}
 	
 	public void decrypt() throws WhatsappBackupReaderException {
-		String keyFileStr;
-		try {
-			keyFileStr = Files.readString(keyPath);
-		} catch (IOException e) {
-			throw new WhatsappBackupReaderException("Cannot read key file", e);
-		}
+		parseHeader();
 		
+		// calculate the key
+		String keyFileStr = new String(keyFileData);
 		byte[] keyFileArr = hexStringToByteArray(keyFileStr);
 		
 		byte[] key;
 		try {
-			key = getKey(keyFileArr);
+			key = calculateKey(keyFileArr);
 		} catch (InvalidKeyException | NoSuchAlgorithmException e) {
 			throw new WhatsappBackupReaderException("Cannot initialize keys", e);
 		}
@@ -156,6 +162,7 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Checksums not equal");
 		}
 		
+		// decrypt
 		GCMParameterSpec parameterSpec = new GCMParameterSpec(LENGTH_AUTHENTICATION_TAG*8, iv);
 		SecretKeySpec secretKeySpec = new SecretKeySpec(key, "AES");
 		
@@ -174,6 +181,7 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Could not decrypt", e);
 		}
 		
+		// unzip
 		Inflater zlib = new Inflater(false);
 		System.out.println("Writing to: " + outputPath);
 		try(FileOutputStream s = new FileOutputStream(outputPath.toFile())) {
