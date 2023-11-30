@@ -29,7 +29,7 @@ public class WhatsappBackupReader {
 	
 	private byte[] keyFileData;
 	
-	private byte[] data;
+	private byte[] cryptFileData;
 	int pos = 0;
 	
 	private byte[] iv;
@@ -38,14 +38,14 @@ public class WhatsappBackupReader {
 	private final int LENGTH_AUTHENTICATION_TAG = 16;
 	private final String ALGORITHM = "HmacSHA256";
 	private final String MESSAGE_STRING = "backup encryption";
-	
+	private final String HEX_VALUES = "0123456789ABCDEF";
 	
 	
 	public WhatsappBackupReader(Path keyPath, Path cryptPath, Path outputPath) throws WhatsappBackupReaderException {
 		this.outputPath = outputPath;
 		try {
 			this.keyFileData = Files.readAllBytes(keyPath);
-			this.data = Files.readAllBytes(cryptPath);
+			this.cryptFileData = Files.readAllBytes(cryptPath);
 		} catch (IOException e) {
 			throw new WhatsappBackupReaderException("Cannot read key or encrypted file", e);
 		}
@@ -60,14 +60,14 @@ public class WhatsappBackupReader {
 	private void parseHeader() throws WhatsappBackupReaderException {
 		byte buf = 0;
 		
-		buf = data[pos]; pos++;
+		buf = cryptFileData[pos]; pos++;
 		
 		int protobufSize = Byte.toUnsignedInt(buf);
 		
 		// A 0x01 as a second byte indicates the presence of the feature table in the protobuf.
 		// It is optional and present only in msgstore database, although
         // Some old msgstore backups exist without it, so it is optional.
-		buf = data[pos]; pos++;
+		buf = cryptFileData[pos]; pos++;
 		int msgstoreFeaturesFlag = Byte.toUnsignedInt(buf);
         if(msgstoreFeaturesFlag != 1) {  
             msgstoreFeaturesFlag = 0;
@@ -77,7 +77,7 @@ public class WhatsappBackupReader {
         	System.out.println("No feature table found (not a msgstore DB or very old)");
         }
 
-        byte[] protobufRaw = Arrays.copyOfRange(data, pos, pos + protobufSize); pos += protobufSize;
+        byte[] protobufRaw = Arrays.copyOfRange(cryptFileData, pos, pos + protobufSize); pos += protobufSize;
         
         BackupPrefix header;
         try {
@@ -144,8 +144,8 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Cannot initialize keys", e);
 		}
 		
-		int checkSumStart = data.length - LENGTH_CHECKSUM;
-		byte[] checksumExpected = Arrays.copyOfRange(data, checkSumStart, data.length);
+		int checkSumStart = cryptFileData.length - LENGTH_CHECKSUM;
+		byte[] checksumExpected = Arrays.copyOfRange(cryptFileData, checkSumStart, cryptFileData.length);
 		
 		// if check md5-checksum is correct
 		MessageDigest md5;
@@ -155,7 +155,7 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Cannot initiate md5 sum generator", e);
 		}
 		
-		md5.update(data, 0, checkSumStart);
+		md5.update(cryptFileData, 0, checkSumStart);
 		byte[] checksumActual = md5.digest();
 		
 		if(!Arrays.equals(checksumExpected, checksumActual)) {
@@ -176,7 +176,7 @@ public class WhatsappBackupReader {
 		
 		byte[] decrypted;
 		try {
-			decrypted = cipher.doFinal(data, pos, checkSumStart - pos);
+			decrypted = cipher.doFinal(cryptFileData, pos, checkSumStart - pos);
 		} catch (IllegalBlockSizeException | BadPaddingException e) {
 			throw new WhatsappBackupReaderException("Could not decrypt", e);
 		}
@@ -198,26 +198,12 @@ public class WhatsappBackupReader {
 	
 	private byte hexCharToByte(char c) throws WhatsappBackupReaderException {
 		c = Character.toUpperCase(c);
-		switch(c) {
-		case '0': return 0;
-		case '1': return 1;
-		case '2': return 2;
-		case '3': return 3;
-		case '4': return 4;
-		case '5': return 5;
-		case '6': return 6;
-		case '7': return 7;
-		case '8': return 8;
-		case '9': return 9;
-		case 'A': return 10;
-		case 'B': return 11;
-		case 'C': return 12;
-		case 'D': return 13;
-		case 'E': return 14;
-		case 'F': return 15;
- 		}
+		int i = HEX_VALUES.indexOf(c);
+		if(i==-1) {
+			throw new WhatsappBackupReaderException("Bad hex character");
+		}
 		
-		throw new WhatsappBackupReaderException("Bad hex character");
+		return (byte)i;
 	}
 	
 	private byte[] hexStringToByteArray(String str) throws WhatsappBackupReaderException {
