@@ -20,11 +20,17 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import whatsappbackupreader.protos.BackupPrefixOuterClass.BackupPrefix;
 
 public class WhatsappBackupReader {
+	
+	private static Logger logger = LogManager.getLogger(WhatsappBackupReader.class);
+	
 	private Path outputPath;
 	
 	private byte[] keyFileData;
@@ -86,7 +92,7 @@ public class WhatsappBackupReader {
 			throw new WhatsappBackupReaderException("Could not backup prefix protobuf", e);
 		}
         
-        System.out.println("Whatsapp version: " + header.getInfo().getAppVersion());
+        logger.info("Whatsapp version: " + header.getInfo().getAppVersion());
         
         if(header.hasC15Iv()) {
         	int size = header.getC15Iv().getIV().size();
@@ -183,7 +189,7 @@ public class WhatsappBackupReader {
 		
 		// unzip
 		Inflater zlib = new Inflater(false);
-		System.out.println("Writing to: " + outputPath);
+		logger.info("Writing to: " + outputPath);
 		try(FileOutputStream s = new FileOutputStream(outputPath.toFile())) {
 			zlib.setInput(decrypted, 0, decrypted.length);
             byte[] buf = new byte[1024];
