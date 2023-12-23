@@ -37,11 +37,11 @@ public class DatabaseDumper {
 		
 		sqlViewCmds = new ArrayList<String>();
         try {
-                sqlViewCmds.add(loadResourceToString("00-notorig_knowncontacts.sql"));
-                sqlViewCmds.add(loadResourceToString("01-v_allcontacts.sql"));
-                sqlViewCmds.add(loadResourceToString("02-v_chatnames.sql"));
-                sqlViewCmds.add(loadResourceToString("03-v_messages_with_ids.sql"));
-                sqlViewCmds.add(loadResourceToString("04-v_messages.sql"));
+                sqlViewCmds.add(loadResourceToString("00-notorig_knowncontacts.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("01-v_allcontacts.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("02-v_chatnames.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("03-v_messages_with_ids.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("04-v_messages.sql.txt"));
         } catch (IOException e) {
                 String msg = "Cannot load internal sql resource file";
                 throw new WhatsappBackupReaderException(msg, e);
@@ -85,8 +85,11 @@ public class DatabaseDumper {
 		this.createExtraSqlViews = createExtraSqlViews;
 	}
 	
-	private String loadResourceToString(String resourceName) throws IOException {
+	private String loadResourceToString(String resourceName) throws IOException, WhatsappBackupReaderException {
 		InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourceName);
+		if(inputStream==null) {
+			throw new WhatsappBackupReaderException("Could not load resource: " + resourceName);
+		}
 		return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
 	}
 
