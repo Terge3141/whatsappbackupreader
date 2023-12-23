@@ -1,15 +1,8 @@
-/* 
 Creates an easy-to-read view of all messages. The ids for chat and sender are not replaced by the contact/chat name.
 Fields are
 messageid, chatid, senderid, text, timestamp
-*/
+
 create view v_messages_with_ids as
-
-/* message from myself */
-select _id 'messageid', chat_row_id 'chatid', "-1" 'senderjid', text_data 'text', message_type 'message_type', timestamp 'timestamp' from message 
-where from_me = 1 and sender_jid_row_id = 0
-
-UNION
 
 /* messages sent only to me */
 select m._id 'messageid', m.chat_row_id 'chatid', j._id 'senderjid', m.text_data 'text', message_type 'message_type', m.timestamp 'timestamp' from message m 
@@ -23,3 +16,9 @@ UNION
 select m._id 'messageid', m.chat_row_id 'chatid', m.sender_jid_row_id 'senderjid', m.text_data 'text', message_type 'message_type', m.timestamp 'timestamp' from message m 
 left join chat c on m.chat_row_id = c._id
 where m.from_me = 0 and m.sender_jid_row_id != 0
+
+UNION
+
+/* message from myself */
+select _id 'messageid', chat_row_id 'chatid', -1 'senderjid', text_data 'text', message_type 'message_type', timestamp 'timestamp' from message 
+where from_me = 1 and sender_jid_row_id = 0

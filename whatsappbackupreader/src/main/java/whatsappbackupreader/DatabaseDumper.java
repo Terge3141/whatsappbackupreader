@@ -23,17 +23,17 @@ public class DatabaseDumper {
 	
 	private List<String> sqlViewCmds;
 
-	public static DatabaseDumper of(Path keyPath, Path cryptPath, Path outputPath)
+	public static DatabaseDumper of(Path cryptPath, Path keyPath, Path outputPath)
 			throws WhatsappBackupReaderException {
 		logger.info("Reading key file from '{}'", keyPath);
 		logger.info("Reading crypt file from '{}'", cryptPath);
 
-		return new DatabaseDumper(keyPath, cryptPath, outputPath);
+		return new DatabaseDumper(cryptPath, keyPath, outputPath);
 	}
 
-	private DatabaseDumper(Path keyPath, Path cryptPath, Path outputPath) throws WhatsappBackupReaderException {
+	private DatabaseDumper(Path cryptPath, Path keyPath, Path outputPath) throws WhatsappBackupReaderException {
 		this.outputPath = outputPath;
-		this.wbr = new WhatsappBackupReader(keyPath, cryptPath, outputPath);
+		this.wbr = new WhatsappBackupReader(cryptPath, keyPath, outputPath);
 		
 		sqlViewCmds = new ArrayList<String>();
         try {

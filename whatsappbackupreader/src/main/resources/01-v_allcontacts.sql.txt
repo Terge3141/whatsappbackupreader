@@ -3,9 +3,9 @@ Contains all contact names for jid.user. If the contact name for a specific numb
 */
 CREATE VIEW v_allcontacts AS
 
-SELECT DISTINCT(j._id) 'userid', COALESCE(kc.name, j.user) 'name' FROM jid j
+SELECT DISTINCT(j._id) 'userid', CAST(COALESCE(kc.name, j.user) AS TEXT) 'name' FROM jid j
 LEFT JOIN notorig_knowncontacts kc ON j.user = kc.user
 
 UNION
 
-SELECT user, name FROM notorig_knowncontacts WHERE user = "-1"
+SELECT -1, name FROM notorig_knowncontacts WHERE user = "-1"

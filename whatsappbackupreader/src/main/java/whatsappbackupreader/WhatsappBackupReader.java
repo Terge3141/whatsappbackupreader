@@ -47,7 +47,7 @@ public class WhatsappBackupReader {
 	private final String HEX_VALUES = "0123456789ABCDEF";
 	
 	
-	public WhatsappBackupReader(Path keyPath, Path cryptPath, Path outputPath) throws WhatsappBackupReaderException {
+	public WhatsappBackupReader(Path cryptPath, Path keyPath, Path outputPath) throws WhatsappBackupReaderException {
 		this.outputPath = outputPath;
 		try {
 			this.keyFileData = Files.readAllBytes(keyPath);
