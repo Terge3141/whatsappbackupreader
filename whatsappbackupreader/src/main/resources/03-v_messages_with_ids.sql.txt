@@ -1,6 +1,6 @@
-Creates an easy-to-read view of all messages. The ids for chat and sender are not replaced by the contact/chat name.
+/*Creates an easy-to-read view of all messages. The ids for chat and sender are not replaced by the contact/chat name.
 Fields are
-messageid, chatid, senderid, text, timestamp
+messageid, chatid, senderid, text, timestamp*/
 
 create view v_messages_with_ids as
 
