@@ -46,7 +46,7 @@ As the WhatsApp Messenger database structure is quite complicated, additional vi
 * type\_description
 	* possible values: TEXT, PICTURE, AUDIO, VIDEO, CONTACT, STATIC_LOCATION, END-TO-END_ENCRYPTION, DOCUMENT, MISSED_VIDEO_CALL, ANIMATION, DELETED_MESSAGE, LIVE_LOCATION, STICKER, INVITATION_TO_WHATSAPP_GROUP
 * text
-* timestamp
+* timestamp (unix timestamp in milliseconds)
 
 ## Run the program to dump database and blobs
 ```bash
