@@ -64,11 +64,11 @@ public class DatabaseDumper {
 		sqlViewCmds = new ArrayList<String>();
         try {
                 sqlViewCmds.add(loadResourceToString("00-notorig_knowncontacts.sql.txt"));
-                sqlViewCmds.add(loadResourceToString("notorig_messagetypes.sql.txt"));
-                sqlViewCmds.add(loadResourceToString("01-v_allcontacts.sql.txt"));
-                sqlViewCmds.add(loadResourceToString("02-v_chatnames.sql.txt"));
-                sqlViewCmds.add(loadResourceToString("03-v_messages_with_ids.sql.txt"));
-                sqlViewCmds.add(loadResourceToString("04-v_messages.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("01-notorig_messagetypes.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("02-v_allcontacts.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("03-v_chatnames.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("04-v_messages_with_ids.sql.txt"));
+                sqlViewCmds.add(loadResourceToString("05-v_messages.sql.txt"));
         } catch (IOException e) {
                 String msg = "Cannot load internal sql resource file";
                 throw new WhatsappBackupReaderException(msg, e);
