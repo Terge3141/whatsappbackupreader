@@ -35,7 +35,7 @@ dumper.run();
 * cryptPath: Path to the android whatsapp messenger file, normally has the name msgstore.db.crypt15.
 * keyPath: Path to the 64-digit encryption key. See https://faq.whatsapp.com/1246476872801203 for details on how to generate it.
 * outputPath: the outputpath where the sql data base is written to, good idea is to name it msgstore.db.
-* contactsPath: A semi-colon separated file containing number and full name
+* contactsPath: A semi-colon separated file containing phone number and full name
 	* 491511234567;Marty McFly
 
 ## Extra views
