@@ -1,0 +1,4 @@
+CREATE TABLE notorig_messagetypes(
+message_type INTEGER,
+message_description TEXT
+);

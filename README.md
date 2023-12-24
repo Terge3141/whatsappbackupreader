@@ -21,26 +21,32 @@ mvn package
 ```java
 Path cryptPath = Paths.get("/path/to/msgstore.db.crypt15");
 Path keyPath = Paths.get("/path/to/keyfile.txt");
-Path outputPath = Paths.get("/path/to/outputdir");
+Path outputPath = Paths.get("/path/to/msgstore.db");
+Path contactsPath = Paths.get("/path/to/contacts"); // optional
 
 DatabaseDumper dumper = DatabaseDumper.of(cryptPath, keyPath, outputPath);
 dumper.setCreateExtraSqlViews(true);
+
+// optional
+dumper.readContacts(contactsPath);
 
 dumper.run();
 ```
 * cryptPath: Path to the android whatsapp messenger file, normally has the name msgstore.db.crypt15.
 * keyPath: Path to the 64-digit encryption key. See https://faq.whatsapp.com/1246476872801203 for details on how to generate it.
-* outputdir: the outputdir where the sql data base is written to.
+* outputPath: the outputpath where the sql data base is written to, good idea is to name it msgstore.db.
+* contactsPath: A semi-colon separated file containing number and full name
+	* 491511234567;Marty McFly
 
 ## Extra views
 As the WhatsApp Messenger database structure is quite complicated, additional views can be created. The view v_messages contains all messages with senders and chatnames:
 * messageid
 * chatname
-* sender
+* sendername
+* type\_description
+	* possible values: TEXT, PICTURE, AUDIO, VIDEO, CONTACT, STATIC_LOCATION, END-TO-END_ENCRYPTION, DOCUMENT, MISSED_VIDEO_CALL, ANIMATION, DELETED_MESSAGE, LIVE_LOCATION, STICKER, INVITATION_TO_WHATSAPP_GROUP
 * text
 * timestamp
-
-TODO: The corresponding attachments (e.g. images and pictures) for the mms message can be found in the _part_ table (v_chats.msgid==part.mid)
 
 ## Run the program to dump database and blobs
 ```bash
