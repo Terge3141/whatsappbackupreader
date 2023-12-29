@@ -54,7 +54,4 @@ java -cp target/whatsappbackupreader-0.0.1-SNAPSHOT-jar-with-dependencies.jar <c
 ```
 
 ## Jitpack
-TODO: Not checked yet
-The packages can also be obtained from jitpack.io and directly included into gradle or maven.
-*Replace tag with the git hash or "master-SNAPSHOT" for the latest version.*
-Go to https://jitpack.io/#Terge3141/whatsappbackupreader for further information.
+The packages can also be obtained from jitpack.io and directly included into gradle or maven. Go to https://jitpack.io/#Terge3141/whatsappbackupreader for further information.
