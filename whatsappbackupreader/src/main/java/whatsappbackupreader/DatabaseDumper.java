@@ -54,12 +54,23 @@ public class DatabaseDumper {
 		logger.info("Reading key file from '{}'", keyPath);
 		logger.info("Reading crypt file from '{}'", cryptPath);
 
-		return new DatabaseDumper(cryptPath, keyPath, outputPath);
+		try {
+			return new DatabaseDumper(cryptPath, Files.readAllBytes(keyPath), outputPath);
+		} catch (IOException e) {
+			throw new WhatsappBackupReaderException("Cannot open key file", e);
+		}
+	}
+	
+	public static DatabaseDumper of(Path cryptPath, byte[] key, Path outputPath)
+			throws WhatsappBackupReaderException {
+		logger.info("Reading crypt file from '{}'", cryptPath);
+
+		return new DatabaseDumper(cryptPath, key, outputPath);
 	}
 
-	private DatabaseDumper(Path cryptPath, Path keyPath, Path outputPath) throws WhatsappBackupReaderException {
+	private DatabaseDumper(Path cryptPath, byte[] key, Path outputPath) throws WhatsappBackupReaderException {
 		this.outputPath = outputPath;
-		this.wbr = new WhatsappBackupReader(cryptPath, keyPath, outputPath);
+		this.wbr = new WhatsappBackupReader(cryptPath, key, outputPath);
 		
 		sqlViewCmds = new ArrayList<String>();
         try {

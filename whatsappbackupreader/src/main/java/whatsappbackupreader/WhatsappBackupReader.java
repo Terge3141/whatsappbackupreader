@@ -48,9 +48,22 @@ public class WhatsappBackupReader {
 	
 	
 	public WhatsappBackupReader(Path cryptPath, Path keyPath, Path outputPath) throws WhatsappBackupReaderException {
-		this.outputPath = outputPath;
 		try {
-			this.keyFileData = Files.readAllBytes(keyPath);
+			setup(cryptPath, Files.readAllBytes(keyPath), outputPath);
+		} catch (IOException e) {
+			throw new WhatsappBackupReaderException("Cannot read key or encrypted file", e);
+		}
+	}
+	
+	public WhatsappBackupReader(Path cryptPath, byte[] keyFileData, Path outputPath) throws WhatsappBackupReaderException {
+		setup(cryptPath, keyFileData, outputPath);
+	}
+	
+	private void setup(Path cryptPath, byte[] keyFileData, Path outputPath) throws WhatsappBackupReaderException {
+		this.outputPath = outputPath;
+		this.keyFileData = keyFileData;
+		
+		try {
 			this.cryptFileData = Files.readAllBytes(cryptPath);
 		} catch (IOException e) {
 			throw new WhatsappBackupReaderException("Cannot read key or encrypted file", e);
