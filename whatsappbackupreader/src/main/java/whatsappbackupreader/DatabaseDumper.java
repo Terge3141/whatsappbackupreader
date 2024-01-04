@@ -101,7 +101,10 @@ public class DatabaseDumper {
 	
 	private void resetContacts() {
 		this.contacts = new Hashtable<String, String>();
-		this.contacts.put("-1", "@@MYSELF@@");
+		
+		if(!this.contacts.containsKey("-1")) {
+			this.contacts.put("-1", "@@MYSELF@@");
+		}
 	}
 
 	private void createExtraSqlViews() throws SQLException {
